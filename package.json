@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "node server.js",
-    "build": "node -e \"console.log('Build completed')\"",
+    "build": "vite build",
+    "preview": "vite preview",
     "start": "node server.js",
     "test": "node --test tests/*.test.js"
   },
@@ -19,5 +20,8 @@
   "license": "MIT",
   "dependencies": {
     "@supabase/supabase-js": "^2.117.3"
+  },
+  "devDependencies": {
+    "vite": "^8.3.4"
   }
 }

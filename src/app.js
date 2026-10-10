@@ -1135,3 +1135,12 @@ export function showToast(message) {
     toast.remove();
   }, 3500);
 }
+
+// Auto-initialize when loaded directly in browser environment
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => initApp());
+  } else {
+    initApp();
+  }
+}

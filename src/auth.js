@@ -1,3 +1,4 @@
+import { createClient as supabaseCreateClient } from '@supabase/supabase-js';
 import { SUPABASE_CONFIG } from './supabase-config.js';
 
 let supabaseClient = null;
@@ -8,14 +9,27 @@ let isAuthLoading = true;
 let authError = null;
 
 /**
- * Returns the Supabase JavaScript library handle from window.supabase
- * or null if not loaded.
+ * Returns the createClient function: prefers the bundled @supabase/supabase-js
+ * package, falling back to window.supabase?.createClient if present.
  */
-function getSupabaseLib() {
-  if (typeof window !== 'undefined' && window.supabase) {
-    return window.supabase;
+function getCreateClientFn() {
+  if (typeof supabaseCreateClient === 'function') {
+    return supabaseCreateClient;
+  }
+  if (typeof window !== 'undefined' && window.supabase && typeof window.supabase.createClient === 'function') {
+    return window.supabase.createClient;
   }
   return null;
+}
+
+/**
+ * Resets cached Supabase client and auth session (primarily for automated testing).
+ */
+export function resetSupabaseClientForTesting() {
+  supabaseClient = null;
+  currentSession = null;
+  currentUser = null;
+  authError = null;
 }
 
 /**
@@ -35,13 +49,13 @@ export function getSupabase() {
   if (supabaseClient) return supabaseClient;
   if (!isSupabaseConfigured()) return null;
 
-  const lib = getSupabaseLib();
-  if (!lib || typeof lib.createClient !== 'function') {
+  const createClientFn = getCreateClientFn();
+  if (!createClientFn) {
     return null;
   }
 
   try {
-    supabaseClient = lib.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey, {
+    supabaseClient = createClientFn(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey, {
       auth: {
         persistSession: true,
         autoRefreshToken: true,

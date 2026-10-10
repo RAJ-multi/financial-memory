@@ -275,11 +275,7 @@
     </div>
   </div>
 
-  <!-- Supabase JS Client UMD bundle installed from npm -->
-  <script src="/node_modules/@supabase/supabase-js/dist/umd/supabase.js"></script>
-  <script type="module">
-    import { initApp } from './src/app.js';
-    initApp();
-  </script>
+  <!-- Application Module Entry Point (bundled by Vite for production) -->
+  <script type="module" src="./src/app.js"></script>
 </body>
 </html>
