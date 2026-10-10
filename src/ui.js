@@ -281,8 +281,8 @@ export function renderDashboard(data, onNavigate, analyticsState = {}) {
         <div class="page-subtitle">Today's spending and historical financial analytics</div>
       </div>
       <div>
-        <button class="btn btn-primary" id="btn-open-add-expense" style="padding: 0.75rem 1.5rem; font-size: 1rem;">
-          + Add Expense
+        <button class="btn btn-primary" id="btn-open-add-expense" style="padding: 0.75rem 1.5rem; font-size: 1rem;" title="Add Expense (Shortcut: E)">
+          + Add Expense <kbd class="kbd-badge">E</kbd>
         </button>
       </div>
     </div>
@@ -440,7 +440,7 @@ export function renderMonthlyHistory(data, onEditExpense, onDeleteExpense) {
         <h1 class="page-title">Monthly History</h1>
         <div class="page-subtitle">${monthName} — Verified records for current month only</div>
       </div>
-      <button class="btn btn-primary" id="btn-open-add-expense">+ Add Expense</button>
+      <button class="btn btn-primary" id="btn-open-add-expense" title="Add Expense (Shortcut: E)">+ Add Expense <kbd class="kbd-badge">E</kbd></button>
     </div>
 
     <div class="card" style="margin-bottom: 1.5rem;">
@@ -498,7 +498,7 @@ export function renderSavings(data, onEditSaving, onDeleteSaving) {
         <h1 class="page-title">Savings</h1>
         <div class="page-subtitle">Track recorded savings contributions against cumulative expenses</div>
       </div>
-      <button class="btn btn-primary" id="btn-open-add-saving">+ Add Saving</button>
+      <button class="btn btn-primary" id="btn-open-add-saving" title="Add Saving Contribution (Shortcut: S)">+ Add Saving <kbd class="kbd-badge">S</kbd></button>
     </div>
 
     <div class="card">
@@ -725,6 +725,27 @@ export function renderSettings(data, hasWallpaper = false, wallpaperUrl = null, 
           <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.35rem;">
             Wallpaper is stored locally in your browser and kept active across sessions.
           </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <h2 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 0.5rem;">Keyboard Shortcuts</h2>
+      <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1rem;">
+        Fast data entry keys for desktop and laptop power users:
+      </p>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem;">
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.6rem 0.85rem; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+          <span style="font-size: 0.88rem; color: var(--text-primary);">Add Expense modal</span>
+          <kbd class="kbd-badge kbd-badge-secondary" style="font-size: 0.85rem; padding: 0.2rem 0.5rem;">E</kbd>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.6rem 0.85rem; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+          <span style="font-size: 0.88rem; color: var(--text-primary);">Add Saving modal</span>
+          <kbd class="kbd-badge kbd-badge-secondary" style="font-size: 0.85rem; padding: 0.2rem 0.5rem;">S</kbd>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.6rem 0.85rem; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+          <span style="font-size: 0.88rem; color: var(--text-primary);">Close active modal</span>
+          <kbd class="kbd-badge kbd-badge-secondary" style="font-size: 0.85rem; padding: 0.2rem 0.5rem;">Esc</kbd>
         </div>
       </div>
     </div>

@@ -37,6 +37,7 @@ import {
   signInWithGoogle,
   signOut
 } from './auth.js';
+import { setupKeyboardShortcuts } from './shortcuts.js';
 
 let currentView = 'dashboard';
 let editingExpenseId = null;
@@ -615,6 +616,23 @@ function setupModals() {
       closeAllModals();
     });
   }
+
+  // Keyboard Shortcuts for quick entry ('E' for Expense, 'S' for Savings, 'Escape' to close)
+  setupKeyboardShortcuts({
+    openExpense: () => openExpenseModal(),
+    openSaving: () => openSavingModal(),
+    closeModals: () => {
+      const activeOverlays = document.querySelectorAll('.modal-overlay.active');
+      if (activeOverlays.length > 0) {
+        closeAllModals();
+        return true;
+      }
+      return false;
+    },
+    isAnyModalOpen: () => {
+      return document.querySelectorAll('.modal-overlay.active').length > 0;
+    }
+  });
 }
 
 function openExpenseModal(existing = null) {
