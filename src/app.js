@@ -30,6 +30,13 @@ import {
   exportExpenseChartPNG,
   formatPeriodLabel
 } from './chart-export.js';
+import {
+  initAuth,
+  subscribeAuth,
+  getAuthState,
+  signInWithGoogle,
+  signOut
+} from './auth.js';
 
 let currentView = 'dashboard';
 let editingExpenseId = null;
@@ -57,7 +64,7 @@ export function initApp() {
   setupFirstVisitPrompt();
   initWallpaper();
 
-  // Reactive subscription
+  // Reactive store subscription
   store.subscribe(data => {
     setDefaultCurrency(data.settings.currency || 'USD');
     applyAppearance(data.settings);
@@ -65,7 +72,35 @@ export function initApp() {
     renderCurrentView();
   });
 
+  // Reactive auth subscription
+  subscribeAuth(authState => {
+    updateSidebarAuthBadge(authState);
+    if (currentView === 'settings') {
+      renderCurrentView();
+    }
+  });
+
+  // Initialize Supabase Auth session & listener
+  initAuth();
+
   renderCurrentView();
+}
+
+function updateSidebarAuthBadge(authState) {
+  const indicator = document.getElementById('sidebar-auth-indicator');
+  const label = document.getElementById('sidebar-auth-label');
+  if (!indicator || !label) return;
+
+  if (authState?.user) {
+    indicator.style.backgroundColor = 'var(--success)';
+    const name = authState.user.user_metadata?.full_name || authState.user.email || 'Signed In';
+    label.textContent = name.length > 14 ? `${name.slice(0, 12)}…` : name;
+    label.title = authState.user.email || 'Signed In';
+  } else {
+    indicator.style.backgroundColor = 'var(--text-muted)';
+    label.textContent = 'Guest Mode';
+    label.title = 'Guest Mode — Local only';
+  }
 }
 
 async function initWallpaper() {
@@ -138,6 +173,14 @@ function setupNavigation() {
     });
   });
 
+  const sidebarAccountBtn = document.getElementById('sidebar-account-btn');
+  if (sidebarAccountBtn) {
+    sidebarAccountBtn.addEventListener('click', () => {
+      navigateTo('settings');
+      sidebar.classList.remove('mobile-open');
+    });
+  }
+
   if (mobileToggle) {
     mobileToggle.addEventListener('click', () => {
       sidebar.classList.toggle('mobile-open');
@@ -174,7 +217,7 @@ function renderCurrentView() {
       bindSavingsEvents();
       break;
     case 'settings':
-      container.innerHTML = renderSettings(data, hasCustomWallpaper, currentWallpaperUrl);
+      container.innerHTML = renderSettings(data, hasCustomWallpaper, currentWallpaperUrl, getAuthState());
       bindSettingsEvents();
       break;
     default:
@@ -501,6 +544,32 @@ function bindSettingsEvents() {
       } catch (err) {
         console.error('Failed to remove wallpaper:', err);
       }
+    });
+  }
+
+  // Account / Authentication Controls
+  const btnGoogleSignIn = document.getElementById('btn-google-signin');
+  if (btnGoogleSignIn) {
+    btnGoogleSignIn.addEventListener('click', async () => {
+      btnGoogleSignIn.disabled = true;
+      btnGoogleSignIn.textContent = 'Connecting...';
+      const result = await signInWithGoogle();
+      if (result?.error) {
+        showToast(`Sign in notice: ${result.error.message || result.error}`);
+        btnGoogleSignIn.disabled = false;
+        renderCurrentView();
+      }
+    });
+  }
+
+  const btnSignOut = document.getElementById('btn-auth-signout');
+  if (btnSignOut) {
+    btnSignOut.addEventListener('click', async () => {
+      btnSignOut.disabled = true;
+      btnSignOut.textContent = 'Signing out...';
+      await signOut();
+      showToast('Signed out. Application is now in Guest mode.');
+      renderCurrentView();
     });
   }
 }

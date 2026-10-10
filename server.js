@@ -22,6 +22,19 @@ createServer(async (req, res) => {
     const pathname = decodeURIComponent(
       new URL(req.url, 'http://localhost').pathname
     );
+
+    // Public frontend config endpoint for safe environment injection
+    if (pathname === '/api/config') {
+      res.writeHead(200, {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Cache-Control': 'no-store'
+      });
+      return res.end(JSON.stringify({
+        supabaseUrl: process.env.SUPABASE_URL || '',
+        supabaseAnonKey: process.env.SUPABASE_ANON_KEY || ''
+      }));
+    }
+
     const relativePath = pathname === '/' ? 'index.html' : pathname.slice(1);
     const filePath = resolve(root, relativePath);
 

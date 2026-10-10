@@ -519,18 +519,114 @@ export function renderSavings(data, onEditSaving, onDeleteSaving) {
   `;
 }
 
-export function renderSettings(data, hasWallpaper = false, wallpaperUrl = null) {
+export function renderSettings(data, hasWallpaper = false, wallpaperUrl = null, authState = null) {
   const currentBudget = data.settings.dailyBudget;
   const currentTheme = data.settings.theme || 'system';
   const currentPreset = data.settings.backgroundPreset || 'default';
   const currentCurrency = data.settings.currency || 'USD';
 
+  const user = authState?.user || null;
+  const isGuest = !user;
+  const isConfigured = authState?.isConfigured ?? false;
+  const userEmail = user?.email || '';
+  const userName = user?.user_metadata?.full_name || user?.user_metadata?.name || '';
+  const userAvatar = user?.user_metadata?.avatar_url || '';
+  const authError = authState?.error || null;
+  const isLoading = authState?.isLoading ?? false;
+
   return `
     <div class="page-header">
       <div>
         <h1 class="page-title">Settings</h1>
-        <div class="page-subtitle">Daily spending target, currency, appearance, and local data controls</div>
+        <div class="page-subtitle">Account, daily spending target, currency, appearance, and local data controls</div>
       </div>
+    </div>
+
+    <!-- Account & Authentication Section -->
+    <div class="card" style="margin-bottom: 1.5rem; border-left: 4px solid ${isGuest ? 'var(--text-muted)' : 'var(--accent-primary)'};">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.75rem;">
+        <div>
+          <h2 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 0.25rem;">Account & Cloud Sync</h2>
+          <div style="font-size: 0.9rem; color: var(--text-secondary);">
+            Sign in with Google to authenticate your identity and prepare for cross-device cloud sync.
+          </div>
+        </div>
+        <div>
+          <span style="display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.3rem 0.75rem; border-radius: var(--radius-sm); font-size: 0.82rem; font-weight: 600; ${
+            isGuest
+              ? 'background-color: var(--bg-surface-hover); color: var(--text-secondary); border: 1px solid var(--border-color);'
+              : 'background-color: var(--success-bg); color: var(--success); border: 1px solid var(--border-color);'
+          }">
+            <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: ${isGuest ? 'var(--text-muted)' : 'var(--success)'};"></span>
+            ${isGuest ? 'Guest Mode' : 'Signed In'}
+          </span>
+        </div>
+      </div>
+
+      ${authError ? `
+        <div class="form-error" style="display: block; margin-bottom: 1rem; padding: 0.65rem 0.9rem; background-color: var(--danger-bg); border-radius: var(--radius-sm);">
+          <strong>Authentication Notice:</strong> ${escapeHtml(authError)}
+        </div>
+      ` : ''}
+
+      ${isGuest ? `
+        <div style="margin-top: 1rem; padding: 1rem; background-color: var(--bg-primary); border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+          <div style="font-size: 0.95rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">
+            You are currently using Financial Memory as a Guest
+          </div>
+          <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 1rem; line-height: 1.45;">
+            All your expenses, savings, and settings are currently stored privately on this device. Sign in with your Google account to connect your identity. Your existing local data remains completely intact and unaffected.
+          </p>
+
+          ${!isConfigured ? `
+            <div style="font-size: 0.85rem; color: var(--warning, #d97706); background-color: rgba(245, 158, 11, 0.1); padding: 0.65rem 0.9rem; border-radius: var(--radius-sm); margin-bottom: 1rem; border: 1px solid rgba(245, 158, 11, 0.3);">
+              ℹ️ <strong>Supabase Configuration Notice:</strong> Supabase project URL and public anon key can be supplied via configuration. Once set, Google OAuth will connect directly to your Supabase project.
+            </div>
+          ` : ''}
+
+          <button type="button" class="btn btn-primary" id="btn-google-signin" ${isLoading ? 'disabled' : ''} style="display: inline-flex; align-items: center; gap: 0.6rem; padding: 0.6rem 1.25rem;">
+            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="flex-shrink: 0;">
+              <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.8 14.8 1 12 1 7.4 1 3.5 3.6 1.6 7.3l3.7 2.9C6.2 7.3 8.8 5 12 5z"/>
+              <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z"/>
+              <path fill="#FBBC05" d="M5.3 14.8c-.2-.7-.4-1.5-.4-2.8s.2-2.1.4-2.8L1.6 6.3C.6 8.3 0 10.5 0 12s.6 3.7 1.6 5.7l3.7-2.9z"/>
+              <path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3.1l-3.7-2.9c-1.1.8-2.6 1.3-4.3 1.3-3.2 0-5.8-2.3-6.7-5.2L1.6 16c1.9 3.7 5.8 7 10.4 7z"/>
+            </svg>
+            ${isLoading ? 'Connecting...' : 'Continue with Google'}
+          </button>
+        </div>
+      ` : `
+        <div style="margin-top: 1rem; padding: 1.25rem; background-color: var(--bg-primary); border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+          <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+            ${userAvatar ? `
+              <img src="${escapeHtml(userAvatar)}" alt="${escapeHtml(userName || userEmail)}" style="width: 52px; height: 52px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent-primary);" />
+            ` : `
+              <div style="width: 52px; height: 52px; border-radius: 50%; background-color: var(--accent-light); color: var(--accent-primary); display: flex; align-items: center; justify-content: center; font-size: 1.4rem; font-weight: 700;">
+                ${escapeHtml((userName || userEmail || 'U').charAt(0).toUpperCase())}
+              </div>
+            `}
+            <div style="flex: 1; min-width: 200px;">
+              <div style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary);">
+                ${escapeHtml(userName || 'Google User')}
+              </div>
+              <div style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 0.15rem;">
+                ${escapeHtml(userEmail)}
+              </div>
+              <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.25rem; word-break: break-all;">
+                User ID: ${escapeHtml(user.id)}
+              </div>
+            </div>
+            <div>
+              <button type="button" class="btn btn-secondary btn-sm" id="btn-auth-signout" style="color: var(--danger); border-color: var(--border-color);">
+                Sign Out
+              </button>
+            </div>
+          </div>
+          <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color); font-size: 0.82rem; color: var(--text-muted); line-height: 1.4;">
+            ✓ Signed in via Google OAuth with Supabase Auth.<br/>
+            ℹ️ Cloud data synchronization has not been activated in this phase. Your local data remains available on this device.
+          </div>
+        </div>
+      `}
     </div>
 
     <div class="card" style="margin-bottom: 1.5rem;">

@@ -16,5 +16,8 @@
     "student"
   ],
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.3"
+  }
 }

@@ -43,7 +43,14 @@
           </button>
         </li>
       </ul>
-      <div style="padding: 1rem 0.5rem; font-size: 0.8rem; color: var(--text-muted); border-top: 1px solid var(--border-color);">
+      <div id="sidebar-auth-status" style="padding: 0.75rem 0.5rem; margin-top: auto; border-top: 1px solid var(--border-color); font-size: 0.8rem; display: flex; align-items: center; justify-content: space-between;">
+        <span style="display: flex; align-items: center; gap: 0.4rem; color: var(--text-secondary);">
+          <span id="sidebar-auth-indicator" style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: var(--text-muted);"></span>
+          <span id="sidebar-auth-label">Guest Mode</span>
+        </span>
+        <button type="button" class="btn btn-secondary btn-sm" id="sidebar-account-btn" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">Account</button>
+      </div>
+      <div style="padding: 0.75rem 0.5rem; font-size: 0.75rem; color: var(--text-muted); border-top: 1px solid var(--border-color);">
         Local-first • Private • Deterministic
       </div>
     </aside>
@@ -268,6 +275,8 @@
     </div>
   </div>
 
+  <!-- Supabase JS Client UMD bundle installed from npm -->
+  <script src="/node_modules/@supabase/supabase-js/dist/umd/supabase.js"></script>
   <script type="module">
     import { initApp } from './src/app.js';
     initApp();
