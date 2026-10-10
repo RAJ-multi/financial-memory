@@ -2,9 +2,15 @@ import { store } from './store.js';
 import { FIXED_CATEGORIES } from './config.js';
 import {
   getTodayDateString,
+  getCurrentYearMonthString,
+  getCurrentYearString,
   getRemainingDailyBudget,
   formatCurrency,
-  round2
+  round2,
+  setDefaultCurrency,
+  getPeriodSummary,
+  getPreviousPeriodKey,
+  getNextPeriodKey
 } from './calculations.js';
 import {
   renderDashboard,
@@ -14,33 +20,109 @@ import {
   escapeHtml
 } from './ui.js';
 import { answerFinancialQuery, SUPPORTED_QUESTIONS } from './query-engine.js';
+import {
+  getWallpaper,
+  saveWallpaper,
+  deleteWallpaper,
+  validateWallpaperFile
+} from './wallpaper-db.js';
+import {
+  exportExpenseChartPNG,
+  formatPeriodLabel
+} from './chart-export.js';
 
 let currentView = 'dashboard';
 let editingExpenseId = null;
 let editingSavingId = null;
 let confirmCallback = null;
 
+let analyticsState = {
+  periodType: 'month',
+  periodKey: getCurrentYearMonthString(),
+  viewMode: 'total'
+};
+
+let currentWallpaperUrl = null;
+let hasCustomWallpaper = false;
+
 // Initialize App
 export function initApp() {
-  applyAppearance(store.getSettings());
+  const initialSettings = store.getSettings();
+  setDefaultCurrency(initialSettings.currency || 'USD');
+  applyAppearance(initialSettings);
+  applyCurrencyLabels(initialSettings.currency || 'USD');
   setupNavigation();
   setupModals();
   setupAskFinancialMemory();
   setupFirstVisitPrompt();
+  initWallpaper();
 
   // Reactive subscription
   store.subscribe(data => {
+    setDefaultCurrency(data.settings.currency || 'USD');
     applyAppearance(data.settings);
+    applyCurrencyLabels(data.settings.currency || 'USD');
     renderCurrentView();
   });
 
   renderCurrentView();
 }
 
+async function initWallpaper() {
+  try {
+    const blob = await getWallpaper();
+    if (blob) {
+      if (currentWallpaperUrl) {
+        URL.revokeObjectURL(currentWallpaperUrl);
+      }
+      currentWallpaperUrl = URL.createObjectURL(blob);
+      hasCustomWallpaper = true;
+      applyWallpaperStyle(currentWallpaperUrl);
+    } else {
+      hasCustomWallpaper = false;
+      clearWallpaperStyle();
+    }
+  } catch (err) {
+    console.warn('Failed to load wallpaper:', err);
+    hasCustomWallpaper = false;
+    clearWallpaperStyle();
+  }
+}
+
+function applyWallpaperStyle(url) {
+  if (typeof document === 'undefined') return;
+  document.body.classList.add('has-custom-wallpaper');
+  document.body.style.setProperty('--custom-wallpaper', `url("${url}")`);
+}
+
+function clearWallpaperStyle() {
+  if (typeof document === 'undefined') return;
+  if (currentWallpaperUrl) {
+    URL.revokeObjectURL(currentWallpaperUrl);
+    currentWallpaperUrl = null;
+  }
+  hasCustomWallpaper = false;
+  document.body.classList.remove('has-custom-wallpaper');
+  document.body.style.removeProperty('--custom-wallpaper');
+}
+
 function applyAppearance(settings) {
   const root = document.documentElement;
   root.setAttribute('data-theme', settings.theme || 'system');
   root.setAttribute('data-preset', settings.backgroundPreset || 'default');
+}
+
+function applyCurrencyLabels(currency = 'USD') {
+  const expLabel = document.getElementById('label-expense-amount');
+  if (expLabel) expLabel.textContent = `Amount (${currency}) *`;
+  const savLabel = document.getElementById('label-saving-amount');
+  if (savLabel) savLabel.textContent = `Amount (${currency}) *`;
+  const firstRunLabel = document.getElementById('label-first-run-budget');
+  if (firstRunLabel) firstRunLabel.textContent = `Daily Spending Target (${currency})`;
+  const firstRunDesc = document.getElementById('first-run-desc');
+  if (firstRunDesc) {
+    firstRunDesc.textContent = `Would you like to set an optional daily spending target in ${currency}? This gives you an everyday reference point on your Dashboard. You can also skip this now and configure it later in Settings.`;
+  }
 }
 
 function setupNavigation() {
@@ -80,7 +162,7 @@ function renderCurrentView() {
 
   switch (currentView) {
     case 'dashboard':
-      container.innerHTML = renderDashboard(data, navigateTo);
+      container.innerHTML = renderDashboard(data, navigateTo, analyticsState);
       bindDashboardEvents();
       break;
     case 'monthly-history':
@@ -92,11 +174,11 @@ function renderCurrentView() {
       bindSavingsEvents();
       break;
     case 'settings':
-      container.innerHTML = renderSettings(data);
+      container.innerHTML = renderSettings(data, hasCustomWallpaper, currentWallpaperUrl);
       bindSettingsEvents();
       break;
     default:
-      container.innerHTML = renderDashboard(data, navigateTo);
+      container.innerHTML = renderDashboard(data, navigateTo, analyticsState);
       bindDashboardEvents();
   }
 }
@@ -110,6 +192,109 @@ function bindDashboardEvents() {
 
   const btnQuickBudget = document.getElementById('btn-quick-set-budget');
   if (btnQuickBudget) btnQuickBudget.addEventListener('click', () => navigateTo('settings'));
+
+  // Analytics Period Selector
+  const periodSelect = document.getElementById('analytics-period-select');
+  if (periodSelect) {
+    periodSelect.addEventListener('change', (e) => {
+      analyticsState.periodType = e.target.value;
+      if (analyticsState.periodType === 'day') {
+        analyticsState.periodKey = getTodayDateString();
+      } else if (analyticsState.periodType === 'year') {
+        analyticsState.periodKey = getCurrentYearString();
+      } else {
+        analyticsState.periodKey = getCurrentYearMonthString();
+      }
+      renderCurrentView();
+    });
+  }
+
+  // Total Spending vs Historical Comparison Mode Toggle
+  const btnTotal = document.getElementById('btn-analytics-total');
+  if (btnTotal) {
+    btnTotal.addEventListener('click', () => {
+      analyticsState.viewMode = 'total';
+      renderCurrentView();
+    });
+  }
+
+  const btnCompare = document.getElementById('btn-analytics-compare');
+  if (btnCompare) {
+    btnCompare.addEventListener('click', () => {
+      analyticsState.viewMode = 'compare';
+      renderCurrentView();
+    });
+  }
+
+  // Navigation: Previous, Next, and Current
+  const btnPrev = document.getElementById('btn-period-prev');
+  if (btnPrev) {
+    btnPrev.addEventListener('click', () => {
+      analyticsState.periodKey = getPreviousPeriodKey(analyticsState.periodType, analyticsState.periodKey);
+      renderCurrentView();
+    });
+  }
+
+  const btnNext = document.getElementById('btn-period-next');
+  if (btnNext) {
+    btnNext.addEventListener('click', () => {
+      analyticsState.periodKey = getNextPeriodKey(analyticsState.periodType, analyticsState.periodKey);
+      renderCurrentView();
+    });
+  }
+
+  const btnToday = document.getElementById('btn-period-today');
+  if (btnToday) {
+    btnToday.addEventListener('click', () => {
+      if (analyticsState.periodType === 'day') {
+        analyticsState.periodKey = getTodayDateString();
+      } else if (analyticsState.periodType === 'year') {
+        analyticsState.periodKey = getCurrentYearString();
+      } else {
+        analyticsState.periodKey = getCurrentYearMonthString();
+      }
+      renderCurrentView();
+    });
+  }
+
+  // Direct Date Pickers
+  const dateInput = document.getElementById('analytics-date-input');
+  if (dateInput) {
+    dateInput.addEventListener('change', (e) => {
+      if (e.target.value) {
+        analyticsState.periodKey = e.target.value;
+        renderCurrentView();
+      }
+    });
+  }
+
+  const monthInput = document.getElementById('analytics-month-input');
+  if (monthInput) {
+    monthInput.addEventListener('change', (e) => {
+      if (e.target.value) {
+        analyticsState.periodKey = e.target.value;
+        renderCurrentView();
+      }
+    });
+  }
+
+  const yearSelect = document.getElementById('analytics-year-select');
+  if (yearSelect) {
+    yearSelect.addEventListener('change', (e) => {
+      if (e.target.value) {
+        analyticsState.periodKey = e.target.value;
+        renderCurrentView();
+      }
+    });
+  }
+
+  // Export Chart
+  const btnExport = document.getElementById('btn-open-export');
+  if (btnExport) {
+    btnExport.addEventListener('click', () => {
+      openExportChartModal(analyticsState.periodType, analyticsState.periodKey);
+    });
+  }
 }
 
 function bindMonthlyHistoryEvents() {
@@ -134,7 +319,7 @@ function bindMonthlyHistoryEvents() {
       if (exp) {
         showConfirmation(
           'Delete Expense',
-          `Are you sure you want to delete this $${exp.amount.toFixed(2)} (${exp.category}) expense?`,
+          `Are you sure you want to delete this ${formatCurrency(exp.amount)} (${exp.category}) expense?`,
           () => {
             store.deleteExpense(id);
             showToast('Expense deleted and totals recalculated.');
@@ -167,7 +352,7 @@ function bindSavingsEvents() {
       if (sav) {
         showConfirmation(
           'Delete Saving Contribution',
-          `Are you sure you want to delete this $${sav.amount.toFixed(2)} saving contribution?`,
+          `Are you sure you want to delete this ${formatCurrency(sav.amount)} saving contribution?`,
           () => {
             store.deleteSaving(id);
             showToast('Saving contribution deleted and all-time total recalculated.');
@@ -179,6 +364,16 @@ function bindSavingsEvents() {
 }
 
 function bindSettingsEvents() {
+  const currencySelect = document.getElementById('settings-currency-select');
+  if (currencySelect) {
+    currencySelect.addEventListener('change', () => {
+      const newCurrency = currencySelect.value;
+      store.setCurrency(newCurrency);
+      setDefaultCurrency(newCurrency);
+      showToast(`Currency updated to ${newCurrency}`);
+    });
+  }
+
   const budgetForm = document.getElementById('form-settings-budget');
   const budgetInput = document.getElementById('settings-budget-input');
   const budgetError = document.getElementById('settings-budget-error');
@@ -235,6 +430,79 @@ function bindSettingsEvents() {
       );
     });
   }
+
+  // Wallpaper Controls
+  const btnChooseWallpaper = document.getElementById('btn-choose-wallpaper');
+  const wallpaperInput = document.getElementById('wallpaper-file-input');
+  const btnRemoveWallpaper = document.getElementById('btn-remove-wallpaper');
+  const wallpaperError = document.getElementById('wallpaper-error');
+  const previewContainer = document.getElementById('wallpaper-preview-container');
+  const previewImg = document.getElementById('wallpaper-preview-img');
+
+  if (btnChooseWallpaper && wallpaperInput) {
+    btnChooseWallpaper.addEventListener('click', () => {
+      wallpaperInput.click();
+    });
+  }
+
+  if (wallpaperInput) {
+    wallpaperInput.addEventListener('change', async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+
+      const validation = validateWallpaperFile(file);
+      if (!validation.valid) {
+        if (wallpaperError) {
+          wallpaperError.textContent = validation.error;
+          wallpaperError.style.display = 'block';
+        }
+        wallpaperInput.value = '';
+        return;
+      }
+
+      if (wallpaperError) {
+        wallpaperError.style.display = 'none';
+      }
+
+      try {
+        await saveWallpaper(file);
+        if (currentWallpaperUrl) {
+          URL.revokeObjectURL(currentWallpaperUrl);
+        }
+        currentWallpaperUrl = URL.createObjectURL(file);
+        hasCustomWallpaper = true;
+        applyWallpaperStyle(currentWallpaperUrl);
+
+        if (previewImg) previewImg.src = currentWallpaperUrl;
+        if (previewContainer) previewContainer.style.display = 'block';
+        if (btnRemoveWallpaper) btnRemoveWallpaper.style.display = 'inline-block';
+
+        showToast('Wallpaper applied successfully.');
+      } catch (err) {
+        console.error('Failed to save wallpaper:', err);
+        if (wallpaperError) {
+          wallpaperError.textContent = 'Failed to save wallpaper image locally.';
+          wallpaperError.style.display = 'block';
+        }
+      }
+      wallpaperInput.value = '';
+    });
+  }
+
+  if (btnRemoveWallpaper) {
+    btnRemoveWallpaper.addEventListener('click', async () => {
+      try {
+        await deleteWallpaper();
+        clearWallpaperStyle();
+        if (previewContainer) previewContainer.style.display = 'none';
+        if (previewImg) previewImg.src = '';
+        btnRemoveWallpaper.style.display = 'none';
+        showToast('Wallpaper removed. Default background restored.');
+      } catch (err) {
+        console.error('Failed to remove wallpaper:', err);
+      }
+    });
+  }
 }
 
 // Modal Handlers
@@ -264,6 +532,9 @@ function setupModals() {
     });
   });
 
+  // Setup Export Chart Modal
+  setupExportModal();
+
   // Confirmation Modal
   const confirmOk = document.getElementById('btn-confirm-ok');
   if (confirmOk) {
@@ -279,6 +550,7 @@ function setupModals() {
 
 function openExpenseModal(existing = null) {
   editingExpenseId = existing ? existing.id : null;
+  applyCurrencyLabels(store.getSettings().currency || 'USD');
   const title = document.getElementById('modal-expense-title');
   const amountInput = document.getElementById('expense-amount');
   const catSelect = document.getElementById('expense-category');
@@ -348,6 +620,7 @@ function handleExpenseSubmit(e) {
 
 function openSavingModal(existing = null) {
   editingSavingId = existing ? existing.id : null;
+  applyCurrencyLabels(store.getSettings().currency || 'USD');
   const title = document.getElementById('modal-saving-title');
   const amountInput = document.getElementById('saving-amount');
   const dateInput = document.getElementById('saving-date');
@@ -414,91 +687,309 @@ function closeAllModals() {
   confirmCallback = null;
 }
 
-// Ask Financial Memory Query Surface
+// Export Chart Modal Logic
+function openExportChartModal(initialType = 'month', initialKey = '') {
+  const modal = document.getElementById('modal-export-chart');
+  if (!modal) return;
+
+  const periodSelect = document.getElementById('export-period-select');
+  const dateInput = document.getElementById('export-date-input');
+  const monthInput = document.getElementById('export-month-input');
+  const yearInput = document.getElementById('export-year-input');
+
+  const type = initialType || 'month';
+  if (periodSelect) periodSelect.value = type;
+
+  if (type === 'day' && dateInput) {
+    dateInput.value = initialKey || getTodayDateString();
+  } else if (type === 'year' && yearInput) {
+    yearInput.value = initialKey || getCurrentYearString();
+  } else if (monthInput) {
+    monthInput.value = initialKey || getCurrentYearMonthString();
+  }
+
+  updateExportModalFields();
+  modal.classList.add('active');
+}
+
+function updateExportModalFields() {
+  const periodSelect = document.getElementById('export-period-select');
+  if (!periodSelect) return;
+  const periodType = periodSelect.value;
+  const dayContainer = document.getElementById('export-date-container-day');
+  const monthContainer = document.getElementById('export-date-container-month');
+  const yearContainer = document.getElementById('export-date-container-year');
+  const dateInput = document.getElementById('export-date-input');
+  const monthInput = document.getElementById('export-month-input');
+  const yearInput = document.getElementById('export-year-input');
+  const previewDiv = document.getElementById('export-summary-preview');
+
+  if (dayContainer) dayContainer.style.display = periodType === 'day' ? 'block' : 'none';
+  if (monthContainer) monthContainer.style.display = periodType === 'month' ? 'block' : 'none';
+  if (yearContainer) yearContainer.style.display = periodType === 'year' ? 'block' : 'none';
+
+  let periodKey = '';
+  if (periodType === 'day') {
+    if (dateInput && !dateInput.value) dateInput.value = getTodayDateString();
+    periodKey = dateInput ? dateInput.value : getTodayDateString();
+  } else if (periodType === 'year') {
+    if (yearInput && !yearInput.value) yearInput.value = getCurrentYearString();
+    periodKey = yearInput ? yearInput.value : getCurrentYearString();
+  } else {
+    if (monthInput && !monthInput.value) monthInput.value = getCurrentYearMonthString();
+    periodKey = monthInput ? monthInput.value : getCurrentYearMonthString();
+  }
+
+  const expenses = store.getExpenses();
+  const summary = getPeriodSummary(expenses, periodType, periodKey);
+  const label = formatPeriodLabel(periodType, periodKey);
+  const currency = store.getSettings().currency || 'USD';
+
+  if (previewDiv) {
+    previewDiv.innerHTML = `
+      <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">
+        ${escapeHtml(label)}
+      </div>
+      <div style="color: var(--text-secondary);">
+        Total Spending: <strong style="color: var(--accent-primary);">${formatCurrency(summary.totalSpending, currency)}</strong> &nbsp;•&nbsp; ${summary.expenseCount} entries recorded
+      </div>
+    `;
+  }
+}
+
+function setupExportModal() {
+  const periodSelect = document.getElementById('export-period-select');
+  const dateInput = document.getElementById('export-date-input');
+  const monthInput = document.getElementById('export-month-input');
+  const yearInput = document.getElementById('export-year-input');
+  const btnDoExport = document.getElementById('btn-do-export-chart');
+
+  if (periodSelect) {
+    periodSelect.addEventListener('change', () => {
+      updateExportModalFields();
+    });
+  }
+
+  if (dateInput) {
+    dateInput.addEventListener('change', () => updateExportModalFields());
+  }
+
+  if (monthInput) {
+    monthInput.addEventListener('change', () => updateExportModalFields());
+  }
+
+  if (yearInput) {
+    yearInput.addEventListener('input', () => updateExportModalFields());
+    yearInput.addEventListener('change', () => updateExportModalFields());
+  }
+
+  if (btnDoExport) {
+    btnDoExport.addEventListener('click', () => {
+      const periodType = document.getElementById('export-period-select').value;
+      let periodKey = '';
+      if (periodType === 'day') {
+        periodKey = document.getElementById('export-date-input').value || getTodayDateString();
+      } else if (periodType === 'year') {
+        periodKey = document.getElementById('export-year-input').value || getCurrentYearString();
+      } else {
+        periodKey = document.getElementById('export-month-input').value || getCurrentYearMonthString();
+      }
+
+      const expenses = store.getExpenses();
+      const currency = store.getSettings().currency || 'USD';
+      const success = exportExpenseChartPNG({ expenses, periodType, periodKey, currency });
+      if (success) {
+        showToast('Chart exported as PNG.');
+        closeAllModals();
+      } else {
+        showToast('Failed to export chart.');
+      }
+    });
+  }
+}
+
+// Ask Financial Memory Conversational Surface
 function setupAskFinancialMemory() {
   const fab = document.getElementById('fab-ask');
   const modal = document.getElementById('modal-ask');
   const input = document.getElementById('ask-input');
-  const btnSubmit = document.getElementById('btn-ask-submit');
-  const resultDiv = document.getElementById('ask-result-container');
-  const suggestionsDiv = document.getElementById('ask-suggestions');
+  const chatForm = document.getElementById('chat-form');
+  const messagesContainer = document.getElementById('chat-messages');
 
   if (!fab || !modal) return;
 
+  const conversationHistory = [];
+
+  function initWelcomeMessage() {
+    if (conversationHistory.length === 0) {
+      conversationHistory.push({
+        role: 'assistant',
+        text: 'Hello! I can help you explore and verify your recorded spending this month. Ask me a question or tap a suggestion below to get started.',
+        suggestions: [
+          'Which category has the highest spending this month?',
+          'Which day had the highest spending this month?'
+        ]
+      });
+      renderChatMessages();
+    }
+  }
+
   fab.addEventListener('click', () => {
     modal.classList.add('active');
-    input.value = '';
-    resultDiv.innerHTML = '';
-    input.focus();
+    initWelcomeMessage();
+    if (input) {
+      setTimeout(() => input.focus(), 60);
+    }
   });
 
-  // Render clickable suggested questions
-  if (suggestionsDiv) {
-    suggestionsDiv.innerHTML = SUPPORTED_QUESTIONS.map(q => `
-      <button type="button" class="btn btn-secondary btn-sm btn-chip" style="font-size: 0.8rem; text-align: left; margin: 0.2rem;">
-        ${escapeHtml(q)}
-      </button>
-    `).join('');
-
-    suggestionsDiv.querySelectorAll('.btn-chip').forEach(chip => {
-      chip.addEventListener('click', () => {
-        input.value = chip.textContent.trim();
-        executeAskQuery();
-      });
+  if (chatForm) {
+    chatForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const q = input ? input.value.trim() : '';
+      if (!q) return;
+      handleSendMessage(q);
     });
   }
 
-  if (btnSubmit) {
-    btnSubmit.addEventListener('click', executeAskQuery);
-  }
+  function handleSendMessage(userQuery) {
+    // Append user message
+    conversationHistory.push({
+      role: 'user',
+      text: userQuery
+    });
 
-  if (input) {
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        executeAskQuery();
+    if (input) {
+      input.value = '';
+    }
+    renderChatMessages();
+
+    // Query existing engine
+    const answer = answerFinancialQuery(userQuery, store.getExpenses());
+    let responseText = '';
+    let evidence = null;
+    let explanation = null;
+    let canVerify = false;
+    let suggestions = [];
+
+    if (answer.status === 'unsupported') {
+      responseText = "I don't have enough context to answer that. I can help you explore your recorded spending, though.";
+      suggestions = [
+        'Which category has the highest spending this month?',
+        'Which day had the highest spending this month?'
+      ];
+    } else if (answer.status === 'no_data') {
+      responseText = answer.directAnswer;
+      explanation = answer.explanation;
+      suggestions = [
+        'Which category has the highest spending this month?',
+        'Which day had the highest spending this month?'
+      ];
+    } else {
+      // success
+      responseText = answer.directAnswer;
+      evidence = answer.evidence || null;
+      canVerify = Boolean(answer.canVerify);
+
+      // Follow-up suggestions
+      if (answer.intent === 'HIGHEST_CATEGORY') {
+        suggestions = ['Which day had the highest spending this month?'];
+      } else if (answer.intent === 'HIGHEST_DAY') {
+        suggestions = ['Which category has the highest spending this month?'];
+      } else {
+        suggestions = [
+          'Which category has the highest spending this month?',
+          'Which day had the highest spending this month?'
+        ];
       }
-    });
-  }
-
-  function executeAskQuery() {
-    const q = input.value.trim();
-    if (!q) return;
-
-    const answer = answerFinancialQuery(q, store.getExpenses());
-    renderAskResult(answer);
-  }
-
-  function renderAskResult(ans) {
-    let verifyBtnHtml = '';
-    if (ans.canVerify) {
-      verifyBtnHtml = `
-        <div style="margin-top: 1rem;">
-          <button class="btn btn-primary btn-sm" id="btn-verify-answer">
-            View Monthly History to Verify
-          </button>
-        </div>
-      `;
     }
 
-    resultDiv.innerHTML = `
-      <div style="background-color: var(--bg-surface-hover); padding: 1.25rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); margin-top: 1rem;">
-        <div style="font-weight: 700; font-size: 1.05rem; margin-bottom: 0.5rem; color: var(--text-primary);">
-          ${escapeHtml(ans.directAnswer)}
-        </div>
-        ${ans.evidence ? `<div style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.5rem;">${escapeHtml(ans.evidence)}</div>` : ''}
-        ${ans.explanation ? `<div style="font-size: 0.9rem; color: var(--text-muted);">${escapeHtml(ans.explanation)}</div>` : ''}
-        ${verifyBtnHtml}
-      </div>
-    `;
+    conversationHistory.push({
+      role: 'assistant',
+      text: responseText,
+      evidence,
+      explanation,
+      canVerify,
+      suggestions
+    });
 
-    const verifyBtn = document.getElementById('btn-verify-answer');
-    if (verifyBtn) {
-      verifyBtn.addEventListener('click', () => {
+    renderChatMessages();
+    if (input) {
+      input.focus();
+    }
+  }
+
+  function renderChatMessages() {
+    if (!messagesContainer) return;
+
+    messagesContainer.innerHTML = conversationHistory.map(msg => {
+      if (msg.role === 'user') {
+        return `
+          <div class="chat-msg-row user">
+            <div class="chat-bubble">
+              <div class="chat-msg-content">${escapeHtml(msg.text)}</div>
+            </div>
+          </div>
+        `;
+      }
+
+      const evidenceHtml = msg.evidence
+        ? `<div class="chat-msg-evidence">${escapeHtml(msg.evidence)}</div>`
+        : '';
+      const explanationHtml = msg.explanation
+        ? `<div class="chat-msg-explanation">${escapeHtml(msg.explanation)}</div>`
+        : '';
+      const verifyHtml = msg.canVerify
+        ? `<div class="chat-verify-action">
+            <button type="button" class="btn btn-primary btn-sm btn-chat-verify">
+              View Monthly History to Verify
+            </button>
+           </div>`
+        : '';
+
+      const suggestionsHtml = (msg.suggestions && msg.suggestions.length > 0)
+        ? `<div class="chat-suggestions-box">
+            <div class="chat-suggestions-title">Suggested questions</div>
+            ${msg.suggestions.map(s => `
+              <button type="button" class="chat-suggestion-chip" data-query="${escapeHtml(s)}">
+                ${escapeHtml(s)}
+              </button>
+            `).join('')}
+           </div>`
+        : '';
+
+      return `
+        <div class="chat-msg-row assistant">
+          <div class="chat-bubble">
+            <div class="chat-msg-content">${escapeHtml(msg.text)}</div>
+            ${evidenceHtml}
+            ${explanationHtml}
+            ${verifyHtml}
+            ${suggestionsHtml}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // Bind suggestion chips to submit new query
+    messagesContainer.querySelectorAll('.chat-suggestion-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const query = chip.getAttribute('data-query');
+        if (query) {
+          handleSendMessage(query);
+        }
+      });
+    });
+
+    // Bind verify buttons to navigate to monthly history
+    messagesContainer.querySelectorAll('.btn-chat-verify').forEach(btn => {
+      btn.addEventListener('click', () => {
         closeAllModals();
         navigateTo('monthly-history');
       });
-    }
+    });
+
+    // Scroll to bottom
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
   }
 }
 

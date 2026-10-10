@@ -57,6 +57,7 @@ class Store {
     try {
       const parsed = JSON.parse(raw);
       if (!parsed.settings) parsed.settings = { ...DEFAULT_SETTINGS };
+      if (!parsed.settings.currency) parsed.settings.currency = 'USD';
       if (!Array.isArray(parsed.expenses)) parsed.expenses = [];
       if (!Array.isArray(parsed.savings)) parsed.savings = [];
       return parsed;
@@ -100,6 +101,11 @@ class Store {
 
   setBackgroundPreset(preset) {
     return this.updateSettings({ backgroundPreset: preset });
+  }
+
+  setCurrency(currency) {
+    const code = (currency || 'USD').toUpperCase();
+    return this.updateSettings({ currency: code });
   }
 
   getExpenses() {
@@ -232,16 +238,18 @@ class Store {
 
   deleteAllLocalData() {
     const current = this.getData();
-    // Preserves appearance preferences
+    // Preserves appearance and currency preferences
     const preservedTheme = current.settings?.theme || 'system';
     const preservedBackground = current.settings?.backgroundPreset || 'default';
+    const preservedCurrency = current.settings?.currency || 'USD';
 
     const fresh = {
       version: 1,
       settings: {
         dailyBudget: null,
         theme: preservedTheme,
-        backgroundPreset: preservedBackground
+        backgroundPreset: preservedBackground,
+        currency: preservedCurrency
       },
       expenses: [],
       savings: []

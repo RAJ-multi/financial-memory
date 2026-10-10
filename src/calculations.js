@@ -4,11 +4,29 @@ export function round2(val) {
   return Math.round((Number(val) + Number.EPSILON) * 100) / 100;
 }
 
-export function formatCurrency(amount) {
+let currentDefaultCurrency = 'USD';
+
+export function setDefaultCurrency(currency) {
+  currentDefaultCurrency = (currency || 'USD').toUpperCase();
+}
+
+export function getDefaultCurrency() {
+  return currentDefaultCurrency;
+}
+
+export function formatCurrency(amount, currency = currentDefaultCurrency) {
   const num = round2(amount);
-  const isNegative = num < 0;
-  const abs = Math.abs(num).toFixed(2);
-  return isNegative ? `-$${abs}` : `$${abs}`;
+  const code = (currency || currentDefaultCurrency || 'USD').toUpperCase();
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: code
+    }).format(num);
+  } catch {
+    const isNegative = num < 0;
+    const abs = Math.abs(num).toFixed(2);
+    return isNegative ? `-${code} ${abs}` : `${code} ${abs}`;
+  }
 }
 
 export function getTodayDateString() {
@@ -176,4 +194,215 @@ export function getCurrentMonthSummary(expenses = [], yearMonth = getCurrentYear
       amount: maxDayAmount
     }
   };
+}
+
+export function getCurrentYearString() {
+  return String(new Date().getFullYear());
+}
+
+export function getExpensesByPeriod(expenses = [], periodType = 'month', periodKey = '') {
+  // Only process expenses, ignore any savings entries
+  const actualExpenses = expenses.filter(e => e && e.type !== 'saving');
+
+  if (periodType === 'day') {
+    const targetDay = periodKey || getTodayDateString();
+    return actualExpenses.filter(e => typeof e.date === 'string' && e.date === targetDay);
+  }
+
+  if (periodType === 'year') {
+    const targetYear = String(periodKey || getCurrentYearString()).slice(0, 4);
+    return actualExpenses.filter(e => typeof e.date === 'string' && e.date.startsWith(targetYear));
+  }
+
+  // default 'month'
+  const targetMonth = String(periodKey || getCurrentYearMonthString()).slice(0, 7);
+  return actualExpenses.filter(e => typeof e.date === 'string' && e.date.startsWith(targetMonth));
+}
+
+export function getPeriodSummary(expenses = [], periodType = 'month', periodKey = '') {
+  const periodExpenses = getExpensesByPeriod(expenses, periodType, periodKey);
+  const totalSpending = round2(periodExpenses.reduce((acc, curr) => acc + Number(curr.amount || 0), 0));
+
+  const categoryTotals = {};
+  for (const cat of FIXED_CATEGORIES) {
+    categoryTotals[cat] = 0;
+  }
+  for (const exp of periodExpenses) {
+    const cat = FIXED_CATEGORIES.includes(exp.category) ? exp.category : 'Other';
+    categoryTotals[cat] = round2(categoryTotals[cat] + Number(exp.amount || 0));
+  }
+
+  const categoryBreakdown = FIXED_CATEGORIES.map(category => {
+    const amount = categoryTotals[category];
+    const percentage = totalSpending > 0 ? round2((amount / totalSpending) * 100) : 0;
+    return {
+      category,
+      amount,
+      percentage
+    };
+  });
+
+  return {
+    periodType,
+    periodKey,
+    totalSpending,
+    expenseCount: periodExpenses.length,
+    categoryBreakdown,
+    hasData: periodExpenses.length > 0
+  };
+}
+
+export function getHistoricalComparison(expenses = [], periodType = 'month', periodKey = '') {
+  // Exclude savings records
+  const actualExpenses = expenses.filter(e => e && e.type !== 'saving');
+
+  if (periodType === 'day') {
+    // Compare daily spending across a selected month
+    const monthKey = String(periodKey || getCurrentYearMonthString()).slice(0, 7);
+    const [year, month] = monthKey.split('-').map(Number);
+    const daysCount = new Date(year, month, 0).getDate();
+    const monthExpenses = actualExpenses.filter(e => typeof e.date === 'string' && e.date.startsWith(monthKey));
+
+    const items = [];
+    let maxTotal = 0;
+    let sumTotal = 0;
+
+    for (let d = 1; d <= daysCount; d++) {
+      const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const dayTotal = round2(
+        monthExpenses.filter(e => e.date === dateStr).reduce((acc, curr) => acc + Number(curr.amount || 0), 0)
+      );
+      if (dayTotal > maxTotal) maxTotal = dayTotal;
+      sumTotal = round2(sumTotal + dayTotal);
+      items.push({
+        key: dateStr,
+        label: String(d),
+        fullLabel: dateStr,
+        total: dayTotal
+      });
+    }
+
+    return {
+      periodType: 'day',
+      parentKey: monthKey,
+      items,
+      maxTotal,
+      totalSpending: sumTotal,
+      hasData: sumTotal > 0
+    };
+  }
+
+  if (periodType === 'year') {
+    // Compare annual spending across all years for which expense records exist
+    const currentYear = getCurrentYearString();
+    const existingYears = actualExpenses
+      .filter(e => typeof e.date === 'string' && e.date.length >= 4)
+      .map(e => e.date.slice(0, 4));
+
+    const allYears = Array.from(new Set([...existingYears, currentYear])).sort();
+
+    const items = [];
+    let maxTotal = 0;
+    let sumTotal = 0;
+
+    for (const y of allYears) {
+      const yearTotal = round2(
+        actualExpenses.filter(e => typeof e.date === 'string' && e.date.startsWith(y)).reduce((acc, curr) => acc + Number(curr.amount || 0), 0)
+      );
+      if (yearTotal > maxTotal) maxTotal = yearTotal;
+      sumTotal = round2(sumTotal + yearTotal);
+      items.push({
+        key: y,
+        label: y,
+        fullLabel: `Year ${y}`,
+        total: yearTotal
+      });
+    }
+
+    return {
+      periodType: 'year',
+      parentKey: 'all',
+      items,
+      maxTotal,
+      totalSpending: sumTotal,
+      hasData: sumTotal > 0
+    };
+  }
+
+  // Default 'month' mode: compare monthly spending across a selected year
+  const yearKey = String(periodKey || getCurrentYearString()).slice(0, 4);
+  const yearExpenses = actualExpenses.filter(e => typeof e.date === 'string' && e.date.startsWith(yearKey));
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  const items = [];
+  let maxTotal = 0;
+  let sumTotal = 0;
+
+  for (let m = 1; m <= 12; m++) {
+    const monthKey = `${yearKey}-${String(m).padStart(2, '0')}`;
+    const monthTotal = round2(
+      yearExpenses.filter(e => e.date.startsWith(monthKey)).reduce((acc, curr) => acc + Number(curr.amount || 0), 0)
+    );
+    if (monthTotal > maxTotal) maxTotal = monthTotal;
+    sumTotal = round2(sumTotal + monthTotal);
+    items.push({
+      key: monthKey,
+      label: monthNames[m - 1],
+      fullLabel: `${monthNames[m - 1]} ${yearKey}`,
+      total: monthTotal
+    });
+  }
+
+    return {
+      periodType: 'month',
+      parentKey: yearKey,
+      items,
+      maxTotal,
+      totalSpending: sumTotal,
+      hasData: sumTotal > 0
+    };
+  }
+
+export function getPreviousPeriodKey(periodType, periodKey) {
+  if (periodType === 'day') {
+    const parts = String(periodKey || getTodayDateString()).split('-').map(Number);
+    const date = new Date(parts[0], parts[1] - 1, parts[2]);
+    date.setDate(date.getDate() - 1);
+    const prevY = date.getFullYear();
+    const prevM = String(date.getMonth() + 1).padStart(2, '0');
+    const prevD = String(date.getDate()).padStart(2, '0');
+    return `${prevY}-${prevM}-${prevD}`;
+  }
+  if (periodType === 'month') {
+    const parts = String(periodKey || getCurrentYearMonthString()).split('-').map(Number);
+    const date = new Date(parts[0], parts[1] - 1, 1);
+    date.setMonth(date.getMonth() - 1);
+    const prevY = date.getFullYear();
+    const prevM = String(date.getMonth() + 1).padStart(2, '0');
+    return `${prevY}-${prevM}`;
+  }
+  const y = parseInt(periodKey || getCurrentYearString(), 10);
+  return String(y - 1);
+}
+
+export function getNextPeriodKey(periodType, periodKey) {
+  if (periodType === 'day') {
+    const parts = String(periodKey || getTodayDateString()).split('-').map(Number);
+    const date = new Date(parts[0], parts[1] - 1, parts[2]);
+    date.setDate(date.getDate() + 1);
+    const nextY = date.getFullYear();
+    const nextM = String(date.getMonth() + 1).padStart(2, '0');
+    const nextD = String(date.getDate()).padStart(2, '0');
+    return `${nextY}-${nextM}-${nextD}`;
+  }
+  if (periodType === 'month') {
+    const parts = String(periodKey || getCurrentYearMonthString()).split('-').map(Number);
+    const date = new Date(parts[0], parts[1] - 1, 1);
+    date.setMonth(date.getMonth() + 1);
+    const nextY = date.getFullYear();
+    const nextM = String(date.getMonth() + 1).padStart(2, '0');
+    return `${nextY}-${nextM}`;
+  }
+  const y = parseInt(periodKey || getCurrentYearString(), 10);
+  return String(y + 1);
 }

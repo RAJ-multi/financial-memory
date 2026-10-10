@@ -53,11 +53,13 @@ test('store CRUD and reset lifecycle works correctly', () => {
   });
   assert.equal(store.getSavings()[0].amount, 55.00);
 
-  // Appearance settings
+  // Appearance & Currency settings
   store.setTheme('dark');
   store.setBackgroundPreset('slate');
+  store.setCurrency('EUR');
   assert.equal(store.getSettings().theme, 'dark');
   assert.equal(store.getSettings().backgroundPreset, 'slate');
+  assert.equal(store.getSettings().currency, 'EUR');
 
   // Delete Expense
   store.deleteExpense(exp.id);
@@ -72,11 +74,12 @@ test('store CRUD and reset lifecycle works correctly', () => {
   store.addSaving({ amount: 20, date: '2026-10-10' });
   store.deleteAllLocalData();
 
-  // Verify full reset while preserving appearance preferences
+  // Verify full reset while preserving appearance and currency preferences
   const finalSettings = store.getSettings();
   assert.equal(finalSettings.dailyBudget, null);
   assert.equal(finalSettings.theme, 'dark'); // preserved!
   assert.equal(finalSettings.backgroundPreset, 'slate'); // preserved!
+  assert.equal(finalSettings.currency, 'EUR'); // preserved!
   assert.equal(store.getExpenses().length, 0);
   assert.equal(store.getSavings().length, 0);
 });

@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Financial Memory — Expense History Explorer</title>
+  <meta name="description" content="A local-first, student-focused expense-history explorer" />
+  <meta property="og:title" content="Financial Memory — Expense History Explorer" />
+  <meta property="og:description" content="A local-first, student-focused expense-history explorer" />
   <link rel="stylesheet" href="css/themes.css" />
   <link rel="stylesheet" href="css/main.css" />
 </head>
@@ -62,9 +65,17 @@
     </div>
   </div>
 
-  <!-- Floating Ask Financial Memory Button -->
-  <button class="fab-query" id="fab-ask" aria-label="Ask Financial Memory">
-    <span>💡</span> Ask Financial Memory
+  <!-- Floating AI Button (Ask Financial Memory) -->
+  <button class="fab-query" id="fab-ask" aria-label="Ask Financial Memory (AI)">
+    <svg class="fab-ai-sparkle" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <!-- Large star -->
+      <path d="M15 3C15 7.4 11.4 11 7 11C11.4 11 15 14.6 15 19C15 14.6 18.6 11 23 11C18.6 11 15 7.4 15 3Z" />
+      <!-- Top-left small star -->
+      <path d="M6 3C6 4.7 4.7 6 3 6C4.7 6 6 7.3 6 9C6 7.3 7.3 6 9 6C7.3 6 6 4.7 6 3Z" />
+      <!-- Bottom-left small star -->
+      <path d="M6 15C6 16.7 4.7 18 3 18C4.7 18 6 19.3 6 21C6 19.3 7.3 18 9 18C7.3 18 6 16.7 6 15Z" />
+    </svg>
+    <span class="fab-ai-label">AI</span>
   </button>
 
   <!-- Expense Modal -->
@@ -76,7 +87,7 @@
       </div>
       <form id="form-expense">
         <div class="form-group">
-          <label class="form-label" for="expense-amount">Amount (USD) *</label>
+          <label class="form-label" id="label-expense-amount" for="expense-amount">Amount (USD) *</label>
           <input type="number" step="0.01" min="0.01" class="form-input" id="expense-amount" placeholder="0.00" required />
         </div>
         <div class="form-group">
@@ -109,7 +120,7 @@
       </div>
       <form id="form-saving">
         <div class="form-group">
-          <label class="form-label" for="saving-amount">Amount (USD) *</label>
+          <label class="form-label" id="label-saving-amount" for="saving-amount">Amount (USD) *</label>
           <input type="number" step="0.01" min="0.01" class="form-input" id="saving-amount" placeholder="0.00" required />
         </div>
         <div class="form-group">
@@ -144,29 +155,92 @@
     </div>
   </div>
 
-  <!-- Ask Financial Memory Modal Popup -->
-  <div class="modal-overlay" id="modal-ask" role="dialog" aria-modal="true">
-    <div class="modal-card" style="max-width: 550px;">
+  <!-- Ask Financial Memory Modal Popup (Conversational Chat Interface) -->
+  <div class="modal-overlay" id="modal-ask" role="dialog" aria-modal="true" aria-label="Financial Memory Chat">
+    <div class="modal-card chat-modal-card">
+      <div class="chat-header">
+        <div class="chat-header-info">
+          <div class="chat-header-avatar" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M15 3C15 7.4 11.4 11 7 11C11.4 11 15 14.6 15 19C15 14.6 18.6 11 23 11C18.6 11 15 7.4 15 3Z" />
+              <path d="M6 3C6 4.7 4.7 6 3 6C4.7 6 6 7.3 6 9C6 7.3 7.3 6 9 6C7.3 6 6 4.7 6 3Z" />
+              <path d="M6 15C6 16.7 4.7 18 3 18C4.7 18 6 19.3 6 21C6 19.3 7.3 18 9 18C7.3 18 6 16.7 6 15Z" />
+            </svg>
+          </div>
+          <div>
+            <h2 class="chat-header-title">Financial Memory</h2>
+            <div class="chat-header-subtitle">Deterministic spending history explorer</div>
+          </div>
+        </div>
+        <button class="modal-close chat-close-btn" aria-label="Close conversation">&times;</button>
+      </div>
+
+      <!-- Scrollable Message Area -->
+      <div class="chat-messages" id="chat-messages" role="log" aria-live="polite"></div>
+
+      <!-- Pinned Chat Input Bar -->
+      <form class="chat-input-bar" id="chat-form">
+        <input
+          type="text"
+          class="chat-input"
+          id="ask-input"
+          placeholder="Ask about this month's spending..."
+          autocomplete="off"
+          aria-label="Ask about this month's spending"
+          required
+        />
+        <button type="submit" class="chat-send-btn" id="btn-ask-submit" aria-label="Send question">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Export Expense Chart Modal -->
+  <div class="modal-overlay" id="modal-export-chart" role="dialog" aria-modal="true">
+    <div class="modal-card" style="max-width: 520px;">
       <div class="modal-header">
         <div>
-          <h2 class="modal-title">Ask Financial Memory</h2>
-          <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">Focused, verifiable spending questions</div>
+          <h2 class="modal-title">Export Expense Chart</h2>
+          <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">Download PNG category breakdown chart</div>
         </div>
         <button class="modal-close" aria-label="Close modal">&times;</button>
       </div>
       <div>
         <div class="form-group">
-          <label class="form-label" for="ask-input">What would you like to verify?</label>
-          <div style="display: flex; gap: 0.5rem;">
-            <input type="text" class="form-input" id="ask-input" placeholder="e.g. Which category has the highest spending this month?" />
-            <button type="button" class="btn btn-primary" id="btn-ask-submit">Ask</button>
-          </div>
+          <label class="form-label" for="export-period-select">Reporting Period</label>
+          <select class="form-select" id="export-period-select">
+            <option value="month">Month</option>
+            <option value="day">Day</option>
+            <option value="year">Year</option>
+          </select>
         </div>
-        <div>
-          <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.4rem;">Supported Questions:</div>
-          <div id="ask-suggestions" style="display: flex; flex-direction: column; gap: 0.3rem;"></div>
+
+        <div class="form-group" id="export-date-container-day" style="display: none;">
+          <label class="form-label" for="export-date-input">Select Date</label>
+          <input type="date" class="form-input" id="export-date-input" />
         </div>
-        <div id="ask-result-container"></div>
+
+        <div class="form-group" id="export-date-container-month">
+          <label class="form-label" for="export-month-input">Select Month</label>
+          <input type="month" class="form-input" id="export-month-input" />
+        </div>
+
+        <div class="form-group" id="export-date-container-year" style="display: none;">
+          <label class="form-label" for="export-year-input">Select Year</label>
+          <input type="number" min="2000" max="2100" class="form-input" id="export-year-input" />
+        </div>
+
+        <div id="export-summary-preview" style="background-color: var(--bg-surface-hover); padding: 0.85rem 1rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); font-size: 0.9rem; margin-bottom: 1.25rem;">
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary btn-modal-cancel">Cancel</button>
+          <button type="button" class="btn btn-primary" id="btn-do-export-chart">Download Chart (PNG)</button>
+        </div>
       </div>
     </div>
   </div>
@@ -178,12 +252,12 @@
         <h2 class="modal-title">Welcome to Financial Memory</h2>
         <button class="modal-close" aria-label="Close modal">&times;</button>
       </div>
-      <p style="font-size: 0.95rem; color: var(--text-secondary); margin-bottom: 1.25rem;">
+      <p style="font-size: 0.95rem; color: var(--text-secondary); margin-bottom: 1.25rem;" id="first-run-desc">
         Would you like to set an optional daily spending target in USD? This gives you an everyday reference point on your Dashboard. You can also skip this now and configure it later in Settings.
       </p>
       <form id="form-first-run">
         <div class="form-group">
-          <label class="form-label" for="first-run-budget-input">Daily Spending Target (USD)</label>
+          <label class="form-label" id="label-first-run-budget" for="first-run-budget-input">Daily Spending Target (USD)</label>
           <input type="number" step="0.01" min="0.01" class="form-input" id="first-run-budget-input" placeholder="e.g. 35.00" />
         </div>
         <div class="form-actions">
