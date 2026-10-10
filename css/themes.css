@@ -1,0 +1,92 @@
+:root {
+  --bg-primary: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-surface-hover: #f1f5f9;
+  --border-color: #e2e8f0;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --accent-primary: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-light: #eff6ff;
+  --success: #16a34a;
+  --success-bg: #f0fdf4;
+  --warning: #d97706;
+  --warning-bg: #fffbeb;
+  --danger: #dc2626;
+  --danger-bg: #fef2f2;
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.08);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+}
+
+/* Explicit Dark Theme */
+[data-theme="dark"] {
+  --bg-primary: #090d16;
+  --bg-surface: #131b2e;
+  --bg-surface-hover: #1b2640;
+  --border-color: #24324f;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --accent-primary: #3b82f6;
+  --accent-hover: #60a5fa;
+  --accent-light: #172554;
+  --success: #22c55e;
+  --success-bg: #052e16;
+  --warning: #f59e0b;
+  --warning-bg: #451a03;
+  --danger: #ef4444;
+  --danger-bg: #450a0a;
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.5);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.5);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.6);
+}
+
+/* System Theme prefers dark */
+@media (prefers-color-scheme: dark) {
+  [data-theme="system"] {
+    --bg-primary: #090d16;
+    --bg-surface: #131b2e;
+    --bg-surface-hover: #1b2640;
+    --border-color: #24324f;
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --accent-primary: #3b82f6;
+    --accent-hover: #60a5fa;
+    --accent-light: #172554;
+    --success: #22c55e;
+    --success-bg: #052e16;
+    --warning: #f59e0b;
+    --warning-bg: #451a03;
+    --danger: #ef4444;
+    --danger-bg: #450a0a;
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.5);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.5);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.6);
+  }
+}
+
+/* Preset Backgrounds */
+[data-preset="slate"] {
+  --bg-primary: #0f172a;
+}
+[data-preset="slate"][data-theme="light"] {
+  --bg-primary: #f1f5f9;
+}
+[data-preset="warm"] {
+  --bg-primary: #1c1917;
+}
+[data-preset="warm"][data-theme="light"] {
+  --bg-primary: #fafaf9;
+}
+[data-preset="cool"] {
+  --bg-primary: #082f49;
+}
+[data-preset="cool"][data-theme="light"] {
+  --bg-primary: #f0f9ff;
+}

@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="system" data-preset="default">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Financial Memory — Expense History Explorer</title>
+  <link rel="stylesheet" href="css/themes.css" />
+  <link rel="stylesheet" href="css/main.css" />
+</head>
+<body>
+  <div class="app-container">
+    <!-- Desktop Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <span class="brand-icon">💳</span>
+        <div>
+          <div class="brand-title">Financial Memory</div>
+          <div style="font-size: 0.75rem; color: var(--text-muted);">Student Edition</div>
+        </div>
+      </div>
+      <ul class="nav-links">
+        <li class="nav-item">
+          <button class="nav-button active" data-view="dashboard">
+            <span>📊</span> Dashboard
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-button" data-view="monthly-history">
+            <span>📅</span> Monthly History
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-button" data-view="savings">
+            <span>🐷</span> Savings
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-button" data-view="settings">
+            <span>⚙️</span> Settings
+          </button>
+        </li>
+      </ul>
+      <div style="padding: 1rem 0.5rem; font-size: 0.8rem; color: var(--text-muted); border-top: 1px solid var(--border-color);">
+        Local-first • Private • Deterministic
+      </div>
+    </aside>
+
+    <div style="flex: 1; display: flex; flex-direction: column; min-width: 0;">
+      <!-- Mobile Top Header -->
+      <header class="mobile-header">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <span style="font-size: 1.3rem;">💳</span>
+          <span style="font-weight: 700; font-size: 1.1rem;">Financial Memory</span>
+        </div>
+        <button class="hamburger-btn" id="mobile-menu-toggle" aria-label="Toggle Navigation Menu">☰</button>
+      </header>
+
+      <!-- Main Dynamic Content Container -->
+      <main class="main-content">
+        <div id="view-container"></div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Floating Ask Financial Memory Button -->
+  <button class="fab-query" id="fab-ask" aria-label="Ask Financial Memory">
+    <span>💡</span> Ask Financial Memory
+  </button>
+
+  <!-- Expense Modal -->
+  <div class="modal-overlay" id="modal-expense" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modal-expense-title">Add Expense</h2>
+        <button class="modal-close" aria-label="Close modal">&times;</button>
+      </div>
+      <form id="form-expense">
+        <div class="form-group">
+          <label class="form-label" for="expense-amount">Amount (USD) *</label>
+          <input type="number" step="0.01" min="0.01" class="form-input" id="expense-amount" placeholder="0.00" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="expense-category">Category *</label>
+          <select class="form-select" id="expense-category" required></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="expense-date">Date *</label>
+          <input type="date" class="form-input" id="expense-date" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="expense-desc">Description (Optional)</label>
+          <input type="text" class="form-input" id="expense-desc" placeholder="e.g. Lunch at cafeteria" />
+        </div>
+        <div class="form-error" id="expense-form-error"></div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary btn-modal-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Expense</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Saving Contribution Modal -->
+  <div class="modal-overlay" id="modal-saving" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modal-saving-title">Add Saving Contribution</h2>
+        <button class="modal-close" aria-label="Close modal">&times;</button>
+      </div>
+      <form id="form-saving">
+        <div class="form-group">
+          <label class="form-label" for="saving-amount">Amount (USD) *</label>
+          <input type="number" step="0.01" min="0.01" class="form-input" id="saving-amount" placeholder="0.00" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="saving-date">Date *</label>
+          <input type="date" class="form-input" id="saving-date" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="saving-desc">Description (Optional)</label>
+          <input type="text" class="form-input" id="saving-desc" placeholder="e.g. Saved from paycheck" />
+        </div>
+        <div class="form-error" id="saving-form-error"></div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary btn-modal-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Contribution</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Confirmation Modal -->
+  <div class="modal-overlay" id="modal-confirm" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title" id="confirm-title">Confirm Action</h2>
+        <button class="modal-close" aria-label="Close modal">&times;</button>
+      </div>
+      <p id="confirm-message" style="margin-bottom: 1.5rem; color: var(--text-secondary); line-height: 1.5;"></p>
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary btn-modal-cancel">Cancel</button>
+        <button type="button" class="btn btn-danger" id="btn-confirm-ok">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ask Financial Memory Modal Popup -->
+  <div class="modal-overlay" id="modal-ask" role="dialog" aria-modal="true">
+    <div class="modal-card" style="max-width: 550px;">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title">Ask Financial Memory</h2>
+          <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">Focused, verifiable spending questions</div>
+        </div>
+        <button class="modal-close" aria-label="Close modal">&times;</button>
+      </div>
+      <div>
+        <div class="form-group">
+          <label class="form-label" for="ask-input">What would you like to verify?</label>
+          <div style="display: flex; gap: 0.5rem;">
+            <input type="text" class="form-input" id="ask-input" placeholder="e.g. Which category has the highest spending this month?" />
+            <button type="button" class="btn btn-primary" id="btn-ask-submit">Ask</button>
+          </div>
+        </div>
+        <div>
+          <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.4rem;">Supported Questions:</div>
+          <div id="ask-suggestions" style="display: flex; flex-direction: column; gap: 0.3rem;"></div>
+        </div>
+        <div id="ask-result-container"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Optional First Run Prompt Modal -->
+  <div class="modal-overlay" id="modal-first-run" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title">Welcome to Financial Memory</h2>
+        <button class="modal-close" aria-label="Close modal">&times;</button>
+      </div>
+      <p style="font-size: 0.95rem; color: var(--text-secondary); margin-bottom: 1.25rem;">
+        Would you like to set an optional daily spending target in USD? This gives you an everyday reference point on your Dashboard. You can also skip this now and configure it later in Settings.
+      </p>
+      <form id="form-first-run">
+        <div class="form-group">
+          <label class="form-label" for="first-run-budget-input">Daily Spending Target (USD)</label>
+          <input type="number" step="0.01" min="0.01" class="form-input" id="first-run-budget-input" placeholder="e.g. 35.00" />
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" id="btn-first-run-skip">Continue without target</button>
+          <button type="submit" class="btn btn-primary">Set Target</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initApp } from './src/app.js';
+    initApp();
+  </script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+/devpost/learner-profile.md
+.env
+.env.*
+*.env
+*.pem
+*.key
+*.secret
+node_modules/
+dist/
