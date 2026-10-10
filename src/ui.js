@@ -300,7 +300,7 @@ export function renderSavings(data, onEditSaving, onDeleteSaving) {
         Recorded savings total — calculated from the savings contributions and expenses you’ve entered. This is not a verified bank balance and may not reflect your actual available money.
       </div>
       <div style="margin-top: 1rem; font-size: 0.85rem; color: var(--text-muted);">
-        Total contributions: <strong>${formatCurrency(savingsResult.totalSavings)}</strong> (${savingsResult.countSavings} entries) &nbsp;|&nbsp; 
+        Total contributions: <strong>${formatCurrency(savingsResult.totalSavings)}</strong> (${savingsResult.countSavings} entries) &nbsp;|&nbsp;
         Cumulative expenses: <strong>${formatCurrency(savingsResult.totalExpenses)}</strong> (${savingsResult.countExpenses} entries)
       </div>
     </div>

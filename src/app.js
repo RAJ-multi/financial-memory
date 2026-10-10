@@ -326,7 +326,7 @@ function handleExpenseSubmit(e) {
       showToast('Expense updated successfully.');
     } else {
       store.addExpense({ amount, category, date, description });
-      
+
       // Daily Budget Impact Reminder Toast
       const budgetStatus = getRemainingDailyBudget(store.getExpenses(), store.getSettings().dailyBudget);
       let budgetMsg = '';
